@@ -1,0 +1,2 @@
+# Lenny Growth Assistant
+A retrieval-augmented generation assistant for Product and Growth leaders.

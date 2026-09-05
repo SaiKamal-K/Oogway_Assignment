@@ -1,0 +1,10 @@
+{
+  "model": "llama3.1:8b",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hi! Answer in 3 words."
+    }
+  ],
+  "stream": false
+}
