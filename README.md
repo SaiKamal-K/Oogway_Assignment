@@ -1,3 +1,4 @@
+# This project is live at: https://oogway-assignment.vercel.app/
 # The Lenny Growth Assistant
 
 > **Enterprise-grade Retrieval-Augmented Generation (RAG) web application and Ship 30 for 30 Content Engine grounded in 200+ hours of *Lenny's Podcast* transcripts.**
