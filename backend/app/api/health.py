@@ -18,18 +18,37 @@ router = APIRouter(prefix="/api/health", tags=["Health"])
 
 @router.get("", response_model=HealthResponse)
 async def check_health(db: AsyncSession = Depends(get_db)):
-    """Comprehensive healthcheck probe reporting Database, Ollama, and Vector Index status."""
+    """Comprehensive healthcheck probe reporting Database, Ollama, Vector Index, and retrieval source status."""
     db_ok = False
     total_chunks = 0
+    vector_index = False
+    retrieval_source = "none"
 
     # 1. Check PostgreSQL & Vector Index
     if db is not None:
         try:
             import asyncio
             stmt = select(func.count(TranscriptChunkModel.id))
-            result = await asyncio.wait_for(db.execute(stmt), timeout=1.0)
+            result = await asyncio.wait_for(db.execute(stmt), timeout=2.0)
             total_chunks = result.scalar() or 0
             db_ok = True
+
+            if total_chunks > 0:
+                retrieval_source = "pgvector"
+
+            # Verify HNSW index existence
+            try:
+                idx_result = await asyncio.wait_for(
+                    db.execute(text(
+                        "SELECT indexname FROM pg_indexes WHERE tablename = 'transcript_chunks' AND indexdef LIKE '%hnsw%';"
+                    )),
+                    timeout=2.0
+                )
+                idx_rows = idx_result.fetchall()
+                vector_index = len(idx_rows) > 0
+            except Exception as idx_err:
+                logger.debug(f"HNSW index check failed: {idx_err}")
+
         except Exception as e:
             logger.debug(f"DB health probe failed ({e}). Checking local cache file.")
             if os.path.exists(LOCAL_CACHE_PATH):
@@ -37,6 +56,7 @@ async def check_health(db: AsyncSession = Depends(get_db)):
                     with open(LOCAL_CACHE_PATH, "r", encoding="utf-8") as f:
                         cached = json.load(f)
                         total_chunks = len(cached)
+                        retrieval_source = "local_cache"
                 except Exception:
                     pass
     else:
@@ -45,6 +65,7 @@ async def check_health(db: AsyncSession = Depends(get_db)):
                 with open(LOCAL_CACHE_PATH, "r", encoding="utf-8") as f:
                     cached = json.load(f)
                     total_chunks = len(cached)
+                    retrieval_source = "local_cache"
             except Exception:
                 pass
 
@@ -72,5 +93,7 @@ async def check_health(db: AsyncSession = Depends(get_db)):
         ollama=ollama_ok,
         ollama_model=settings.OLLAMA_MODEL,
         total_chunks=total_chunks,
-        cloud_providers=cloud_status
+        cloud_providers=cloud_status,
+        vector_index=vector_index,
+        retrieval_source=retrieval_source
     )
